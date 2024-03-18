@@ -1,0 +1,17 @@
+version: 2
+
+sources:
+    - name: raw_data
+      database: b2b_software_study
+      schema: write
+      tables: 
+        - name: y_combinator_raw_data
+    - name: crunchbase
+      database: b2b_software_study
+      schema: datasets
+      tables:
+        - name: crunchbase_funding_rounds
+        - name: crunchbase_investors
+        - name: crunchbase_ipos
+        - name: crunchbase_organizations
+        - name: positions_latest
