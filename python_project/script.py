@@ -9,12 +9,12 @@ total_number_of_pages = response.json()['totalPages']
 
 try:
     connection = connector.connect(
-            user = 'sandbox_user',
-            password = r'I3i3pU%h%O^qXkxh$aq',
-            account = 'oca47409.us-east-1',
-            warehouse = 'RESEARCH',
-            database = 'B2B_SOFTWARE_STUDY_ROLE',
-            schema = 'WRITE'
+            user = '...',
+            password = '...',
+            account = '...',
+            warehouse = '...',
+            database = '...',
+            schema = '...'
         )
     cursor = connection.cursor()
 
