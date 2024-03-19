@@ -1,61 +1,126 @@
+from typing import Dict
 import requests
 import json
-import snowflake.connector as connector
+import snowflake.connector
 
-url = 'https://api.ycombinator.com/v0.1/companies'
+class YCombinatorAPI:
+    """Handles interactions with the Y Combinator API."""
+    BASE_URL = 'https://api.ycombinator.com/v0.1/companies'
 
-response = requests.get(url)
-total_number_of_pages = response.json()['totalPages']
+    @staticmethod
+    def get_total_pages() -> int:
+        """
+        Get the total number of pages available in the API.
 
-try:
-    connection = connector.connect(
-            user = '...',
-            password = '...',
-            account = '...',
-            warehouse = '...',
-            database = '...',
-            schema = '...'
+        Returns:
+        - int: The total number of pages.
+        """
+        total_pages = requests.get(YCombinatorAPI.BASE_URL).json()['totalPages']
+        return total_pages
+
+    @staticmethod
+    def fetch_companies(page: int) -> str:
+        """
+        Fetch companies from a specific page of the Y Combinator API and select certain fields.
+
+        Parameters:
+        - page (int): The page number to fetch.
+        
+        Returns:
+        - str: String containing a list of companies, each represented as a dictionary with selected fields.
+        """
+        response = requests.get(f'{YCombinatorAPI.BASE_URL}?page={page}')
+        data = response.json()['companies']
+        list_of_filtered_companies = []
+        for company in data:
+            company_filtered = {
+                    "id":company["id"],
+                    "name":company["name"].replace("\'",""),
+                    "slug":"" if company["slug"]==None else company["slug"],
+                    "website":company["website"],
+                    "teamSize":company["teamSize"],
+                    "url":company["url"],
+                    "batch":"" if company["batch"]==None else company["batch"],
+                    "status":company["status"],
+                    "industries":company["industries"],
+                    "regions":[region.replace("\'s","s") for region in company["locations"]],
+                    "locations":[location.replace("\'s","s") for location in company["locations"]]
+                }
+            list_of_filtered_companies.append(company_filtered)
+        return json.dumps(list_of_filtered_companies)
+    
+
+class SnowflakeDatabase:
+    """Manages database operations in Snowflake."""
+    def __init__(self, user: str, password: str, account: str, warehouse: str, database: str, schema: str):
+        self.user = user
+        self.password = password
+        self.account = account
+        self.warehouse = warehouse
+        self.database = database
+        self.schema = schema
+
+    def __enter__(self) -> 'SnowflakeDatabase':
+        self.connection = snowflake.connector.connect(
+            user=self.user,
+            password=self.password,
+            account=self.account,
+            warehouse=self.warehouse,
+            database=self.database,
+            schema=self.schema
         )
-    cursor = connection.cursor()
+        return self
 
-    sql = 'CREATE TABLE IF NOT EXISTS B2B_SOFTWARE_STUDY.WRITE.Y_COMBINATOR_RAW_DATA (JSON variant);'
-    records = cursor.execute(sql)
-    print('TABLE CREATED')
-    connection.commit()
+    def __exit__(self, *args) -> None:
+        self.connection.close()
 
-    url = 'https://api.ycombinator.com/v0.1/companies'
-    
-    response = requests.get(url)
-    total_number_of_pages = response.json()['totalPages']
-    total_number_of_companies_added = 0
-    for i in range(1,total_number_of_pages+1):
-        print(f'WORKING ON PAGE NUMBER: {i}')
-        data = requests.get(f'https://api.ycombinator.com/v0.1/companies?page={i}')
-        companies = []
-        for j in data.json()['companies']:
-            company = {
-                "id":j["id"],
-                "name":j["name"].replace("\'",""),
-                "slug":"" if j["slug"]==None else j["slug"],
-                "website":j["website"],
-                "teamSize":j["teamSize"],
-                "url":j["url"],
-                "batch":"" if j["batch"]==None else j["batch"],
-                "status":j["status"],
-                "industries":j["industries"],
-                "regions":[region.replace("\'s","s") for region in j["locations"]],
-                "locations":[location.replace("\'s","s") for location in j["locations"]]
-            }
-            companies.append(company)
-        total_number_of_companies_added+=len(companies)
-        company_data = json.dumps(companies)
-        sql = f"""INSERT INTO B2B_SOFTWARE_STUDY.WRITE.Y_COMBINATOR_RAW_DATA (JSON) SELECT PARSE_JSON('{company_data}') ;"""
-        records = cursor.execute(sql)
-        print(f"PAGE {i} DATA SUCCESS. INSERTED {len(companies)} COMPANIES! {total_number_of_companies_added} COMPANIES IN TOTAL")
-        connection.commit()
+    def create_table(self) -> None:
+        """
+        Creates a table if it doesn't exist.
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute('CREATE TABLE IF NOT EXISTS B2B_SOFTWARE_STUDY.WRITE.Y_COMBINATOR_RAW_DATA (JSON VARIANT);')
+            print('TABLE CREATED')
 
-except Exception as e:
-    print(e)
-finally:
-    connection.close()
-    
+    def insert_companies(self, companies: str) -> None:
+        """
+        Inserts a list of companies into the database.
+
+        Parameters:
+        - companies (str): A list of companies to insert.
+        """
+        with self.connection.cursor() as cursor:
+            cursor.execute(f"""INSERT INTO B2B_SOFTWARE_STUDY.WRITE.Y_COMBINATOR_RAW_DATA (JSON) SELECT PARSE_JSON('{companies}') ;""")
+
+class MainProcess:
+    """Orchestrates fetching data from Y Combinator API and storing it in Snowflake."""
+    def __init__(self, db_params: Dict[str, str]):
+        self.db = SnowflakeDatabase(**db_params)
+
+    def run(self) -> None:
+        """
+        Executes the main process of fetching and storing company data.
+        """
+        total_pages = YCombinatorAPI.get_total_pages()
+        
+        with self.db as database:
+            database.create_table()
+            
+            for page in range(1, total_pages + 1):
+                print(f'WORKING ON PAGE NUMBER: {page}')
+                companies = YCombinatorAPI.fetch_companies(page)
+                database.insert_companies(companies)
+                
+                print(f"PAGE {page} DATA SUCCESS!")
+
+db_params = {
+    'user': 'sandbox_user',
+    'password': r'I3i3pU%h%O^qXkxh$aq',
+    'account': 'oca47409.us-east-1',
+    'warehouse': 'RESEARCH',
+    'database': 'B2B_SOFTWARE_STUDY',
+    'schema': 'WRITE'
+}
+
+main_process = MainProcess(db_params)
+main_process.run()
