@@ -79,7 +79,7 @@ class SnowflakeDatabase:
         Creates a table if it doesn't exist.
         """
         with self.connection.cursor() as cursor:
-            cursor.execute('CREATE TABLE IF NOT EXISTS B2B_SOFTWARE_STUDY.WRITE.Y_COMBINATOR_RAW_DATA (JSON VARIANT);')
+            cursor.execute('CREATE TABLE IF NOT EXISTS aaa.bbb.ccc (JSON VARIANT);')
             print('TABLE CREATED')
 
     def insert_companies(self, companies: str) -> None:
@@ -90,7 +90,7 @@ class SnowflakeDatabase:
         - companies (str): A list of companies to insert.
         """
         with self.connection.cursor() as cursor:
-            cursor.execute(f"""INSERT INTO B2B_SOFTWARE_STUDY.WRITE.Y_COMBINATOR_RAW_DATA (JSON) SELECT PARSE_JSON('{companies}') ;""")
+            cursor.execute(f"""INSERT INTO aaa.bbb.ccc (JSON) SELECT PARSE_JSON('{companies}') ;""")
 
 class MainProcess:
     """Orchestrates fetching data from Y Combinator API and storing it in Snowflake."""
@@ -114,12 +114,12 @@ class MainProcess:
                 print(f"PAGE {page} DATA SUCCESS!")
 
 db_params = {
-    'user': 'sandbox_user',
-    'password': r'I3i3pU%h%O^qXkxh$aq',
-    'account': 'oca47409.us-east-1',
-    'warehouse': 'RESEARCH',
-    'database': 'B2B_SOFTWARE_STUDY',
-    'schema': 'WRITE'
+    'user': '...',
+    'password': r'...',
+    'account': '...',
+    'warehouse': '...',
+    'database': '...',
+    'schema': '...'
 }
 
 main_process = MainProcess(db_params)
